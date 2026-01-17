@@ -1,0 +1,239 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid py-3" style="background: #f4f7f6; min-height: 100vh;">
+    <div class="d-flex justify-content-between align-items-center bg-white p-3 rounded-3 shadow-sm mb-4 border-start border-warning border-5">
+        <div>
+            <h4 class="fw-bold mb-0 text-dark">
+                <span class="badge bg-dark me-2">T-{{ table.table_number }}</span>
+                {{ table.section.name }}
+            </h4>
+            <small class="text-muted">Order ID: #{{ order_id }} | Manager: {{ user.username }}</small>
+        </div>
+        <a href="{% url 'floor_plan' %}" class="btn btn-outline-danger btn-sm fw-bold">
+            <i class="bi bi-x-circle me-1"></i> Exit Screen
+        </a>
+    </div>
+
+    <div class="bg-white p-2 rounded-pill shadow-sm mb-4 sticky-top d-flex gap-2 overflow-auto no-scrollbar" style="top: 10px; z-index: 1000;">
+        {% for cat in categories %}
+        <a href="#cat-{{ cat.id }}" class="btn btn-outline-secondary border-0 rounded-pill px-4 fw-bold text-nowrap cat-link">
+            {{ cat.name|upper }}
+        </a>
+        {% endfor %}
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            {% for cat in categories %}
+            <div id="cat-{{ cat.id }}" class="mb-5 category-section">
+                <h5 class="fw-bold text-uppercase text-secondary mb-3 border-bottom pb-2">{{ cat.name }}</h5>
+                <div class="row g-3">
+                    {% for item in cat.items.all %}
+                    <div class="col-md-4 col-sm-6">
+                        <div class="card h-100 border-0 shadow-sm rounded-4 overflow-hidden">
+                            {% if item.image %}
+                                <img src="{{ item.image.url }}" class="card-img-top" style="height: 140px; object-fit: cover;">
+                            {% else %}
+                                <div class="bg-light d-flex align-items-center justify-content-center" style="height: 140px;">
+                                    <i class="bi bi-egg-fried fs-1 text-muted opacity-25"></i>
+                                </div>
+                            {% endif %}
+                            <div class="card-body p-3 d-flex flex-column">
+                                <div class="d-flex justify-content-between">
+                                    <h6 class="fw-bold text-dark text-truncate">{{ item.name }}</h6>
+                                    <span>{% if item.food_type == 'VEG' %}🟢{% else %}🔴{% endif %}</span>
+                                </div>
+                                <div class="mt-auto d-flex justify-content-between align-items-center mt-3">
+                                    <span class="h6 fw-bold mb-0">₹{{ item.price }}</span>
+                                    <button onclick="addToCart({{ item.id }})" class="btn btn-warning btn-sm fw-bold px-3 rounded-3 shadow-sm">
+                                        ADD +
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm rounded-4 sticky-top" style="top: 80px;">
+                <div class="card-header bg-dark text-white py-3 rounded-top-4">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-receipt me-2"></i>Running Order</h5>
+                </div>
+                <div class="card-body p-0 overflow-auto" id="cartItemsContainer" style="max-height: 45vh;">
+                    <div id="emptyCartMsg" class="text-center py-5 text-muted">
+                        <i class="bi bi-cart3 fs-1 d-block mb-2"></i>
+                        <p>No items added yet</p>
+                    </div>
+                </div>
+                <div class="card-footer bg-white border-top-0 p-4">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Subtotal</span>
+                        <span class="fw-bold" id="cartSubtotal">₹0</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-4">
+                        <span class="h5 fw-bold text-dark">Total Bill</span>
+                        <span class="h5 fw-bold text-primary" id="cartTotal">₹0</span>
+                    </div>
+
+                    <form id="orderSubmitForm" method="POST" action="{% url 'place_order' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="order_id" value="{{ order_id }}">
+                        <input type="hidden" name="cart_data" id="cartDataInput">
+                        
+                        <button type="button" onclick="finalizeOrder()" id="submitOrderBtn" class="btn btn-primary btn-lg w-100 rounded-3 fw-bold shadow-sm" disabled>
+                            PROCEED <i class="bi bi-chevron-right"></i>
+                        </button>
+                    </form>
+                </div>
+                <div class="mt-3">
+                    <a href="{% url 'request_bill' order_id %}" 
+                        onclick="return confirm('Kya aap Cashier ko bill request bhejna chahte hain?')"
+                        class="btn btn-outline-danger w-100 fw-bold py-2 shadow-sm">
+                            <i class="bi bi-bell me-2"></i> REQUEST BILL FROM CASHIER
+                        </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Data from Django
+    const menuData = JSON.parse('{{ menu_json|safe }}');
+    const dbItems = JSON.parse('{{ existing_json|safe }}'); // Pehle se kitchen mein gaye items
+    const orderId = "{{ order_id }}";
+    const cartKey = `cart_order_${orderId}`;
+
+    // Initialize Cart: Agar localstorage mein hai toh wahan se, nahi toh DB se
+    let cart = JSON.parse(localStorage.getItem(cartKey));
+    if (!cart) {
+        cart = {
+            order_id: orderId,
+            items: dbItems // Database wale items load ho rahe hain
+        };
+        localStorage.setItem(cartKey, JSON.stringify(cart));
+    }
+
+    function addToCart(itemId) {
+        let itemInfo = null;
+        for (let cat of menuData) {
+            let found = cat.items.find(i => i.id == itemId);
+            if (found) { itemInfo = found; break; }
+        }
+
+        if (itemInfo) {
+            // Check if it's already in cart as a "new" item
+            let existingNewItem = cart.items.find(i => i.id == itemId && i.is_existing !== true);
+            
+            if (existingNewItem) {
+                existingNewItem.quantity += 1;
+            } else {
+                cart.items.push({
+                    id: itemInfo.id,
+                    name: itemInfo.name,
+                    price: itemInfo.price,
+                    quantity: 1,
+                    is_existing: false // Naya item hai
+                });
+            }
+            saveAndRefresh();
+        }
+    }
+
+    function updateQty(itemId, delta) {
+        // Sirf un items ki qty badhegi/ghategi jo abhi "New" hain
+        let item = cart.items.find(i => i.id == itemId && i.is_existing !== true);
+        if (item) {
+            item.quantity += delta;
+            if (item.quantity <= 0) {
+                cart.items = cart.items.filter(i => !(i.id == itemId && i.is_existing !== true));
+            }
+            saveAndRefresh();
+        }
+    }
+
+    function saveAndRefresh() {
+        localStorage.setItem(cartKey, JSON.stringify(cart));
+        renderUI();
+    }
+
+    function renderUI() {
+        const container = document.getElementById('cartItemsContainer');
+        const submitBtn = document.getElementById('submitOrderBtn');
+        let total = 0;
+        
+        if (cart.items.length === 0) {
+            container.innerHTML = `
+                <div id="emptyCartMsg" class="text-center py-5 text-muted">
+                    <i class="bi bi-cart3 fs-1 d-block mb-2"></i>
+                    <p>No items added yet</p>
+                </div>`;
+            submitBtn.disabled = true;
+        } else {
+            // PROCEED tabhi enable hoga jab koi naya item add hoga
+            const hasNewItems = cart.items.some(i => i.is_existing === false);
+            submitBtn.disabled = !hasNewItems;
+
+            let html = '<div class="list-group list-group-flush">';
+            cart.items.forEach(item => {
+                let sub = item.price * item.quantity;
+                total += sub;
+                const isOld = item.is_existing === true;
+
+                html += `
+                    <div class="list-group-item px-3 py-3 border-bottom border-light ${isOld ? 'bg-light opacity-75' : ''}">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <span class="fw-bold small ${isOld ? 'text-muted' : 'text-dark'}">${item.name}</span>
+                                ${isOld ? '<br><span class="badge bg-secondary" style="font-size: 10px;">SENT</span>' : ' <span class="badge bg-success" style="font-size: 10px;">NEW</span>'}
+                            </div>
+                            <span class="fw-bold text-primary small">₹${sub}</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            ${!isOld ? `
+                                <button onclick="updateQty(${item.id}, -1)" class="btn btn-outline-secondary btn-xs rounded-circle" style="width:24px; height:24px; padding:0; line-height:1;">-</button>
+                                <span class="fw-bold px-2">${item.quantity}</span>
+                                <button onclick="updateQty(${item.id}, 1)" class="btn btn-outline-secondary btn-xs rounded-circle" style="width:24px; height:24px; padding:0; line-height:1;">+</button>
+                            ` : `<span class="small text-muted">Confirmed Qty: ${item.quantity}</span>`}
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+        
+        document.getElementById('cartSubtotal').innerText = `₹${total}`;
+        document.getElementById('cartTotal').innerText = `₹${total}`;
+    }
+
+    function finalizeOrder() {
+        const cartDataString = localStorage.getItem(cartKey);
+        if (!cartDataString) return;
+
+        document.getElementById('cartDataInput').value = cartDataString;
+
+        if(confirm("Confirm update? Purane items ke saath naye items kitchen bhej diye jayenge.")) {
+            localStorage.removeItem(cartKey); // Submit ke baad clear taaki fresh DB data aaye
+            document.getElementById('orderSubmitForm').submit();
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', renderUI);
+</script>
+
+<style>
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .cat-link:hover { background-color: #f8f9fa; color: #ffc107 !important; }
+    html { scroll-behavior: smooth; }
+    .category-section { scroll-margin-top: 80px; }
+    .btn-xs { font-size: 0.75rem; }
+    .opacity-75 { opacity: 0.75; }
+</style>
+{% endblock %}

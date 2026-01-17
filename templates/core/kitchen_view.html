@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<script>
+    // Auto refresh taaki naye orders bina page reload kiye dikhte rahein
+    setTimeout(function(){
+       location.reload();
+    }, 20000);
+</script>
+
+<div class="container-fluid py-4" style="background: #121212; min-height: 100vh; color: white;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold text-warning"><i class="bi bi-fire me-2"></i>KITCHEN LIVE ORDERS</h2>
+        <div class="text-end">
+            <span class="badge bg-secondary d-block mb-1">Auto-refreshing every 20s</span>
+            <small class="text-muted">Last Update: {% now "H:i:s" %}</small>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        {% for order in orders %}
+        <div class="col-md-4">
+            <div class="card bg-dark border-warning shadow-lg rounded-4">
+                <div class="card-header border-secondary d-flex justify-content-between align-items-center py-3">
+                    <h4 class="mb-0 text-white">Table {{ order.table.table_number }}</h4>
+                    <span class="badge bg-info text-dark">{{ order.created_at|timesince }} ago</span>
+                </div>
+                
+                <div class="card-body">
+                    <h6 class="text-muted text-uppercase small mb-3">Items to Prepare:</h6>
+                    <ul class="list-group list-group-flush bg-transparent">
+                        {# Sirf wahi items jo 'PREPARING' status mein hain #}
+                        {% for item in order.items_to_cook %}
+                        <li class="list-group-item bg-transparent text-white border-secondary px-0 d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center">
+                                <span class="badge bg-warning text-dark me-2 fs-6">{{ item.quantity }}x</span>
+                                <span class="fs-5">{{ item.menu_item.name }}</span>
+                            </div>
+                            <span>
+                                {% if item.menu_item.food_type == 'VEG' %}
+                                    <span title="Veg">🟢</span>
+                                {% else %}
+                                    <span title="Non-Veg">🔴</span>
+                                {% endif %}
+                            </span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+
+                <div class="card-footer border-secondary p-3">
+                    <form action="{% url 'mark_as_served' order.id %}" method="POST">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-success w-100 fw-bold py-2">
+                            MARK AS READY <i class="bi bi-check2-circle ms-1"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12 text-center py-5">
+            <div class="py-5">
+                <i class="bi bi-emoji-smile fs-1 text-muted"></i>
+                <h3 class="text-muted mt-3">All clear! No pending orders.</h3>
+                <p class="text-secondary">Naye orders aate hi yahan dikhne lagenge.</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+    /* Kitchen Screen Specific Styles */
+    .card {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        border-width: 2px;
+    }
+    .card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 10px 20px rgba(255, 193, 7, 0.2) !important;
+    }
+    .list-group-item {
+        border-bottom-style: dashed !important;
+        padding-top: 12px !important;
+        padding-bottom: 12px !important;
+    }
+    /* Scrollbar styling for dark mode */
+    ::-webkit-scrollbar {
+        width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+        background: #121212;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #333;
+        border-radius: 10px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #444;
+    }
+</style>
+{% endblock %}

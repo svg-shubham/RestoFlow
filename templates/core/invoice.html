@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            
+            <div id="printableArea" class="card shadow-lg border-0 rounded-4 overflow-hidden">
+                <div class="card-header bg-dark text-white text-center py-4">
+                    <h2 class="fw-bold mb-0">RESTO FLOW</h2>
+                    <p class="small mb-0 opacity-75">Customer Satisfaction is Our Priority</p>
+                    <p class="small mb-0 opacity-75">GST: 09ABCDE1234F1Z5</p>
+                </div>
+
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
+                        <div>
+                            <h6 class="text-muted small mb-0">TABLE</h6>
+                            <h3 class="fw-bold mb-0">T-{{ order.table.table_number }}</h3>
+                        </div>
+                        <div class="text-end">
+                            <h6 class="text-muted small mb-0">DATE & TIME</h6>
+                            <p class="mb-0 fw-bold small">{{ order.created_at|date:"d M Y, h:i A" }}</p>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-borderless">
+                            <thead>
+                                <tr class="text-muted small border-bottom">
+                                    <th class="ps-0">ITEM</th>
+                                    <th class="text-center">QTY</th>
+                                    <th class="text-end pe-0">PRICE</th>
+                                    <th class="text-end pe-0">TOTAL</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in items %}
+                                <tr class="align-middle">
+                                    <td class="ps-0 py-2">
+                                        <div class="fw-bold">{{ item.menu_item.name }}</div>
+                                    </td>
+                                    <td class="text-center">{{ item.quantity }}</td>
+                                    <td class="text-end">₹{{ item.price_at_order }}</td>
+                                    <td class="text-end pe-0 fw-bold">₹{{ item.item_total|floatformat:2 }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center py-4 text-danger">No items found!</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="border-top mt-3 pt-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted">Subtotal:</span>
+                            <span class="fw-bold">₹{{ subtotal|floatformat:2 }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1 text-muted small">
+                            <span>GST (5%):</span>
+                            <span>₹{{ tax|floatformat:2 }}</span>
+                        </div>
+                        <hr class="my-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h4 class="fw-bold mb-0">Total Payable</h4>
+                            <h4 class="fw-bold mb-0 text-primary">₹{{ total|floatformat:2 }}</h4>
+                        </div>
+                    </div>
+
+                    <div class="text-center mt-5">
+                        <p class="small text-muted border-top pt-3">*** Thank You! Visit Again ***</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 no-print">
+                <form method="POST" class="card p-4 border-0 shadow-sm rounded-4 bg-light">
+                    {% csrf_token %}
+                    <h5 class="fw-bold mb-3"><i class="bi bi-wallet2 me-2"></i>Payment Settlement</h5>
+                    
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Select Payment Mode</label>
+                        <select name="payment_mode" class="form-select border-2" required>
+                            <option value="CASH">Cash</option>
+                            <option value="ONLINE">UPI / Online</option>
+                            <option value="CARD">Credit / Debit Card</option>
+                        </select>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-4">
+                            <button type="button" onclick="window.print()" class="btn btn-outline-dark w-100 py-2">
+                                <i class="bi bi-printer-fill"></i>
+                            </button>
+                        </div>
+                        <div class="col-8">
+                            <button type="submit" class="btn btn-success w-100 py-2 fw-bold">
+                                COLLECT & CLOSE
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                <a href="{% url 'cashier_dashboard' %}" class="btn btn-link w-100 text-decoration-none mt-2">
+                    <i class="bi bi-arrow-left"></i> Back to Dashboard
+                </a>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Printing Logic */
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        #printableArea, #printableArea * {
+            visibility: visible;
+        }
+        #printableArea {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            border: none !important;
+            box-shadow: none !important;
+        }
+        .no-print, .navbar, footer {
+            display: none !important;
+        }
+    }
+
+    /* Dashed line effect */
+    .table tbody tr {
+        border-bottom: 1px dashed #dee2e6;
+    }
+</style>
+{% endblock %}
